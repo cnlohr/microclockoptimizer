@@ -599,9 +599,14 @@ function onCSChange()
 </HEAD>
 <BODY onLoad="onLoad();">
 
+
 <TABLE>
 <TR>
 <TD>
+
+<TABLE>
+<TR>
+<TD VALIGN=TOP>
 <SELECT ID="chipSelect" onChange="onCSChange();solve();">
 </SELECT>
 </TD>
@@ -613,8 +618,12 @@ function onCSChange()
 </TABLE>
 <DIV ID=tableConstraints></DIV>
 
+</TD>
+<TD VALIGN=TOP>
 <DIV ID=generalNotes></DIV>
-
+</TD>
+</TR>
+</TABLE>
 <DIV ID=solveStatus></DIV>
 <TABLE ID=solveEntries></TABLE>
 
