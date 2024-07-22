@@ -150,6 +150,26 @@ function generateURL()
 	for( var i = 0; i < clkctx.clocks.length; i++ )
 	{
 		let c = clkctx.clocks[i];
+		if( c.type == "select" )
+		{
+			uurl += `${c.name}=${c.locked?1:0},${c.selIndex}&`;
+		}
+		else
+		{
+			uurl += `${c.name}=${c.locked?1:0},${encodeURIComponent(c.value)}&`;
+		}
+	}
+	return uurl;
+}
+
+function updateOutput()
+{
+	var urlparts = window.location.href.split("?");
+	var uurl = generateURL();
+
+	for( var i = 0; i < clkctx.clocks.length; i++ )
+	{
+		let c = clkctx.clocks[i];
 		let tb = document.getElementById( c.name + "_text" );
 
 		if( c.value < c.min || c.value > c.max )
@@ -184,13 +204,10 @@ function generateURL()
 			let tsel = document.getElementById( c.name + "_sel" );
 			tsel.value = c.selIndex;
 			tsel.disabled = !c.locked;
-
-			uurl += `${c.name}=${c.locked?1:0},${c.selIndex}&`;
 		}
 		else
 		{
 			tb.disabled = (!c.locked) && (!c.disableDynamic);
-			uurl += `${c.name}=${c.locked?1:0},${encodeURIComponent(c.value)}&`;
 		}
 
 		if( c.changable )
@@ -203,13 +220,7 @@ function generateURL()
 			tb.disabled = true;
 		}
 	}
-	return uurl;
-}
 
-function updateOutput()
-{
-	var urlparts = window.location.href.split("?");
-	var uurl = generateURL();
 	//Doing this will add every adjustment to your history. TODO: Consider removing it.
 	window.history.replaceState('', '', uurl);
 	urlField.innerHTML = `<A HREF="${uurl}">Link</A> <A HREF="${urlparts[0]}">Reset</A>`;
@@ -245,7 +256,7 @@ function emitNewRowFromSolverEvent( ctx )
 			var str = "";
 			if( c.type === "select" )
 			{
-				str += `${c.optionValues[c.selIndex]} (${c.options[c.selIndex]}) (${Math.round((v + Number.EPSILON) * 100) / 100})`;
+				str += `${c.options[c.selIndex]} (${Math.round((v + Number.EPSILON) * 100) / 100})`;
 			}
 			else
 			{
@@ -253,6 +264,8 @@ function emitNewRowFromSolverEvent( ctx )
 			}
 			newCell.appendChild( document.createTextNode( str ) );
 		}
+
+		ctx.listed++;
 	}
 }
 
@@ -270,6 +283,7 @@ function solverEvent()
 		}
 		ctx.clkAdvanceIndex = 0;
 		ctx.solvnum = 0;
+		ctx.listed = 0;
 
 		let row = document.getElementById( "solveEntries" ).insertRow( -1 );
 		let newCell = row.insertCell( -1 );
@@ -284,7 +298,6 @@ function solverEvent()
 	}
 	if( !ctx.done )
 	{
-
 		var ctxbackups = new Array( ctx.clocks.length );
 		for( var i in ctx.clocks )
 		{
@@ -295,6 +308,7 @@ function solverEvent()
 			a.selIndex = a.locked ? a.selIndex : a.selOpt;
 		}
 
+		// Don't do too many at once or the UI will be unresponsive.
 		let remain = 1000;
 
 		for( ; remain > 0 && !ctx.done; remain-- )
@@ -342,12 +356,13 @@ function solverEvent()
 		// Don't keep running some insane number of rows.
 		if( ctx.solvnum >= 100000 ) ctx.done = true;
 
-		document.getElementById( "solveStatus" ).innerHTML = `Tested ${ctx.solvnum} solves`;
-
+		// If no free solutions, at least display our current entry.
 		if( ctx.done && ctx.solvnum == 0 )
 		{
 			emitNewRowFromSolverEvent( ctx );
 		}
+
+		document.getElementById( "solveStatus" ).innerHTML = `Showing ${ctx.listed}/${ctx.solvnum > 0 ? ctx.solvnum : 1} solves`;
 
 		for( var i in ctx.clocks )
 		{
@@ -445,7 +460,6 @@ function loadFromURL(url)
 						c.txtvalue = c.value;
 					}
 					c.locked = equsright[0] > 0.5;
-					console.log( c );
 				}
 			}
 		}
@@ -538,7 +552,7 @@ function onCSChange()
 			tabhtml += `<TD><SELECT ID="${c.name}_sel" VALUE=${c.selIndex} ONCHANGE="fieldUpdateSelect(this, ${i});" ONWHEEL="wheelSel(this, event, ${i});" >`;
 			for( var j = 0; j < c.options.length; j++ )
 			{
-				tabhtml += `<OPTION VALUE="${c.optionValues[j]}">${c.options[j]}</OPTION>`
+				tabhtml += `<OPTION VALUE="${c.optionValues[j]}">${c.options[j]} (${c.optionValues[j]})</OPTION>`
 			}
 			tabhtml += `</SELECT></TD>`;
 		}
