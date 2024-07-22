@@ -238,7 +238,8 @@ function emitNewRowFromSolverEvent( ctx )
 		if( c.locked && c.value != c.txtvalue && c.txtvalue ) isOk = false;
 	}
 
-	if( isOk )
+	// Don't show more than 10,000 rows, or it will slow the browser down.
+	if( isOk && ctx.listed < 10000 )
 	{
 		let row = document.getElementById( "solveEntries" ).insertRow( -1 );
 
@@ -355,7 +356,7 @@ function solverEvent()
 		}
 
 		// Don't keep running some insane number of rows.
-		if( ctx.solvnum >= 100000 ) ctx.done = true;
+		if( ctx.solvnum >= 10000000 ) ctx.done = true;
 
 		// If no free solutions, at least display our current entry.
 		if( ctx.done && ctx.solvnum == 0 )
