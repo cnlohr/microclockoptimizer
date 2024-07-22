@@ -569,6 +569,9 @@ function onCSChange()
 
 	tableConstraints = document.getElementById( "tableConstraints" );
 	tableConstraints.innerHTML = tabhtml;
+
+	// No matter what is going on, need to restart the solver.
+	clkctx.done = true;
 }
 
 </SCRIPT>
@@ -579,7 +582,7 @@ function onCSChange()
 <TABLE>
 <TR>
 <TD>
-<SELECT ID="chipSelect" onChange="onCSChange();">
+<SELECT ID="chipSelect" onChange="onCSChange();solve();">
 <OPTION VALUE="ch32vx05_7,d8c">CH32V30x_D8C, CH32V31x_D8C</option>
 <OPTION VALUE="ch32vx05_7,v23def">CH32V20x_D6, CH32V20x_D8</option>
 <OPTION VALUE="ch32vx05_7,d8w">CH32V20x_D8W, CH32V30x_D8</option>
