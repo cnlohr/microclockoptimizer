@@ -342,9 +342,9 @@ function solverEvent()
 		}
 
 		// Don't do too many at once or the UI will be unresponsive.
-		let remain = 1000;
-
-		for( ; remain > 0 && !ctx.done; remain-- )
+		let startTime = window.performance.now();
+		const timeoutMs = 4;
+		while( window.performance.now() - startTime < timeoutMs )
 		{
 			let c = null;
 			do
