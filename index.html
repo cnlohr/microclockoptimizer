@@ -16,15 +16,15 @@ function iterateOptions( ths, ctx )
 {
 	if( ths.locked ) return false;
 
-	var next = ths.selopt + 1;
+	var next = ths.selOpt + 1;
 	if( next == ths.optionValues.length )
 	{
-		ths.selopt = 0;
+		ths.selOpt = 0;
 		return false;
 	}
 	else
 	{
-		ths.selopt = next;
+		ths.selOpt = next;
 		return true;
 	}
 }
@@ -139,9 +139,10 @@ function fieldUpdateLockBox( ths, fieldID )
 	solve();
 }
 
-function updateOutput()
+function generateURL()
 {
-	var uurl = window.location.href.split("?")[0] + "?";
+	var urlparts = window.location.href.split("?");
+	var uurl = urlparts[0] + "?";
 
 	// chipSelect must be first.
 	uurl += `chipSelect=${encodeURIComponent(document.getElementById("chipSelect").value)}&`;
@@ -184,12 +185,12 @@ function updateOutput()
 			tsel.value = c.selIndex;
 			tsel.disabled = !c.locked;
 
-			uurl += `${c.name}=${c.selIndex}&`;
+			uurl += `${c.name}=${c.locked?1:0},${c.selIndex}&`;
 		}
 		else
 		{
 			tb.disabled = (!c.locked) && (!c.disableDynamic);
-			uurl += `${c.name}=${encodeURIComponent(c.value)}&`;
+			uurl += `${c.name}=${c.locked?1:0},${encodeURIComponent(c.value)}&`;
 		}
 
 		if( c.changable )
@@ -202,14 +203,62 @@ function updateOutput()
 			tb.disabled = true;
 		}
 	}
+	return uurl;
+}
+
+function updateOutput()
+{
+	var urlparts = window.location.href.split("?");
+	var uurl = generateURL();
 	//Doing this will add every adjustment to your history. TODO: Consider removing it.
 	window.history.replaceState('', '', uurl);
-	urlField.innerHTML = `<A HREF="${uurl}">link</A>`;
+	urlField.innerHTML = `<A HREF="${uurl}">Link</A> <A HREF="${urlparts[0]}">Reset</A>`;
+}
+
+
+function emitNewRowFromSolverEvent( ctx )
+{
+	var isOk = true;
+	for( var k in ctx.clocks )
+	{
+		let c = ctx.clocks[k];
+		if( c.value < c.min - 0.0001 || c.value > c.max + 0.0001 ) isOk = false;
+		if( c.locked && c.value != c.txtvalue && c.txtvalue ) isOk = false;
+	}
+
+	if( isOk )
+	{
+		let row = document.getElementById( "solveEntries" ).insertRow( -1 );
+
+		let newCell = row.insertCell( -1 );
+		var link = document.createElement('a');
+		link.href = generateURL();
+		link.innerText = "Link";
+		newCell.appendChild( link );
+
+		for( var k in ctx.clocks )
+		{
+			let c = ctx.clocks[k];
+			let newCell = row.insertCell( -1 );
+			let v = c.value;
+			v = Number( v );
+			var str = "";
+			if( c.type === "select" )
+			{
+				str += `${c.optionValues[c.selIndex]} (${c.options[c.selIndex]}) (${Math.round((v + Number.EPSILON) * 100) / 100})`;
+			}
+			else
+			{
+				str += Math.round((v + Number.EPSILON) * 100) / 100;
+			}
+			newCell.appendChild( document.createTextNode( str ) );
+		}
+	}
 }
 
 // This gets fired every frame, so we can do a little work
 // to try to resolve some solutions.
-function solverThread()
+function solverEvent()
 {
 	let ctx = clkctx;
 
@@ -217,12 +266,14 @@ function solverThread()
 	{
 		for( var i in ctx.clocks )
 		{
-			ctx.clocks[i].selopt = 0;
+			ctx.clocks[i].selOpt = 0;
 		}
 		ctx.clkAdvanceIndex = 0;
 		ctx.solvnum = 0;
 
 		let row = document.getElementById( "solveEntries" ).insertRow( -1 );
+		let newCell = row.insertCell( -1 );
+		newCell.appendChild( document.createTextNode( "" ) );
 		for( var k in ctx.clocks )
 		{
 			let c = ctx.clocks[k];
@@ -241,6 +292,7 @@ function solverThread()
 			let a = ctx.clocks[i];
 			b.value = a.value;
 			b.selIndex = a.selIndex;
+			a.selIndex = a.locked ? a.selIndex : a.selOpt;
 		}
 
 		let remain = 1000;
@@ -267,7 +319,7 @@ function solverThread()
 			if( c != null )
 			{
 				br = c.iterateFunction( c, ctx );
-				c.selIndex = c.selopt;
+				c.selIndex = c.selOpt;
 
 				if( !br )
 				{
@@ -281,42 +333,21 @@ function solverThread()
 				}
 
 				solveInternal( ctx );
-
-				var isOk = true;
-				for( var k in ctx.clocks )
-				{
-					let c = ctx.clocks[k];
-					if( c.value < c.min - 0.0001 || c.value > c.max + 0.0001 ) isOk = false;
-					if( c.locked && c.value != c.txtvalue && c.txtvalue ) isOk = false;
-				}
-
-				if( isOk )
-				{
-					let row = document.getElementById( "solveEntries" ).insertRow( -1 );
-					for( var k in ctx.clocks )
-					{
-						let c = ctx.clocks[k];
-						let newCell = row.insertCell( -1 );
-						let v = c.value;
-						v = Number( v );
-						var str = "";
-						if( c.type === "select" )
-						{
-							str += `${c.optionValues[c.selIndex]} (${c.options[c.selIndex]}) (${Math.round((v + Number.EPSILON) * 100) / 100})`;
-						}
-						else
-						{
-							str += Math.round((v + Number.EPSILON) * 100) / 100;
-						}
-						newCell.appendChild( document.createTextNode( str ) );
-					}
-				}
+				emitNewRowFromSolverEvent( ctx );
 
 				ctx.solvnum++;
 			}
 		}
 
+		// Don't keep running some insane number of rows.
+		if( ctx.solvnum >= 100000 ) ctx.done = true;
+
 		document.getElementById( "solveStatus" ).innerHTML = `Tested ${ctx.solvnum} solves`;
+
+		if( ctx.done && ctx.solvnum == 0 )
+		{
+			emitNewRowFromSolverEvent( ctx );
+		}
 
 		for( var i in ctx.clocks )
 		{
@@ -347,17 +378,19 @@ function solve()
 	solveInternal( clkctx );
 
 	// Kick off a general solve.
-	let backup_thread = clkctx?.thread;
+	let backup_event = clkctx?.event;
 	clkctx = clkctx;
 	clkctx.done = false;
 	clkctx.restart = true;
-	clkctx.thread = backup_thread;
+	clkctx.event = backup_event;
 	document.getElementById( "solveEntries" ).innerHTML = "";
 	document.getElementById( "solveEntries" ).border = 1;
-	if( !clkctx.thread )
+	if( !clkctx.event )
 	{
-		clkctx.thread = setInterval( solverThread, 0 );
+		clkctx.event = setInterval( solverEvent, 0 );
 	}
+	// Get one event in this frame to prevent frame flashing.
+	solverEvent();
 	updateOutput();
 }
 
@@ -380,6 +413,7 @@ function loadFromURL(url)
 			onCSChange();
 		}
 	}
+
 	if( !csFound )
 	{
 		onCSChange();
@@ -390,7 +424,10 @@ function loadFromURL(url)
 	{
 		var f = fields[fid];
 		var eqs = f.split("=");
-		eqs[1] = decodeURIComponent( eqs[1] );
+		if( eqs.length < 2 ) continue;
+		var equsright = eqs[1].split(",");
+		equsright[1] = decodeURIComponent( equsright[1] );
+		if( equsright.length < 2 ) continue;
 		if( eqs[0] !== "chipSelect" )
 		{
 			for( var cid in clkctx.clocks )
@@ -400,13 +437,15 @@ function loadFromURL(url)
 				{
 					if( c.type === "select" )
 					{
-						c.selIndex = Number( eqs[1] );
+						c.selIndex = Number( equsright[1] );
 					}
 					else
 					{
-						c.value = eqs[1];
+						c.value = Number(equsright[1]);
 						c.txtvalue = c.value;
 					}
+					c.locked = equsright[0] > 0.5;
+					console.log( c );
 				}
 			}
 		}
