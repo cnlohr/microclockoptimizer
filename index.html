@@ -10,22 +10,21 @@ input.unmatch-input, textarea { background: rgba(255.0, 255.0, 0.0, 0.2 ); }
 </STYLE>
 
 <SCRIPT>
-// TODO: Handle solving
-// TODO: Solve in web worker?
+var clkctx = null;
 
-function iterateOptions( ths )
+function iterateOptions( ths, ctx )
 {
 	if( ths.locked ) return false;
 
 	var next = ths.selopt + 1;
-	if( ths.selopt == ths.optionValues.length )
+	if( next == ths.optionValues.length )
 	{
-		this.selopt = 0;
+		ths.selopt = 0;
 		return false;
 	}
 	else
 	{
-		this.selopt = next;
+		ths.selopt = next;
 		return true;
 	}
 }
@@ -34,8 +33,6 @@ function iterateOptions( ths )
 //  .value = MHz
 //  .selIndex = index of selected option.
 //  .locked = target locking this value.
-var clkctx_dynamic = null;
-var clkctx = null;
 var clocks_ch32vx05_7 = [
 	{ default : 8,    min : 8,  max : 8,  name : "HSI",          locked : true,  disableDynamic : true, changable : false, type : "text" },
 	{ default : 24,   min : 3,  max : 25,  name : "HSE",         locked : false, disableDynamic : true, changable : true, type : "text" },
@@ -125,6 +122,7 @@ var clocks_ch32vx05_7 = [
 
 function fieldUpdateText( e, fieldID )
 {
+	clkctx.clocks[fieldID].txtvalue = e.value;
 	clkctx.clocks[fieldID].value = e.value;
 	solve();
 }
@@ -209,25 +207,125 @@ function updateOutput()
 	urlField.innerHTML = `<A HREF="${uurl}">link</A>`;
 }
 
+// This gets fired every frame, so we can do a little work
+// to try to resolve some solutions.
 function solverThread()
 {
-	let ctx = clkctx_dynamic;
+	let ctx = clkctx;
+
 	if( ctx.restart )
 	{
 		for( var i in ctx.clocks )
 		{
 			ctx.clocks[i].selopt = 0;
 		}
-		ctx.clkadvanceindex = 0;
+		ctx.clkAdvanceIndex = 0;
+		ctx.solvnum = 0;
+
+		let row = document.getElementById( "solveEntries" ).insertRow( -1 );
+		for( var k in ctx.clocks )
+		{
+			let c = ctx.clocks[k];
+			let newCell = row.insertCell( -1 );
+			newCell.appendChild( document.createTextNode( c.name ) );
+		}
+		ctx.restart = false;
 	}
 	if( !ctx.done )
 	{
-		let remain = 0;
-		
-		console.log( clkctx_dynamic );
+
+		var ctxbackups = new Array( ctx.clocks.length );
+		for( var i in ctx.clocks )
+		{
+			let b = ctxbackups[i] = new Object();
+			let a = ctx.clocks[i];
+			b.value = a.value;
+			b.selIndex = a.selIndex;
+		}
+
+		let remain = 1000;
+
+		for( ; remain > 0 && !ctx.done; remain-- )
+		{
+			let c = null;
+			do
+			{
+				if( ctx.clkAdvanceIndex >= ctx.clocks.length )
+				{
+					c = null;
+					ctx.done = true;
+					break;
+				}
+				c = ctx.clocks[ctx.clkAdvanceIndex];
+				if( c.iterateFunction && !c.locked )
+				{
+					break;
+				}
+				ctx.clkAdvanceIndex++;
+			} while( true );
+
+			if( c != null )
+			{
+				br = c.iterateFunction( c, ctx );
+				c.selIndex = c.selopt;
+
+				if( !br )
+				{
+					// Jump levels (At end)
+					ctx.clkAdvanceIndex++;
+				}
+				else
+				{
+					// We have more to traverse.
+					ctx.clkAdvanceIndex = 0;
+				}
+
+				solveInternal( ctx );
+
+				var isOk = true;
+				for( var k in ctx.clocks )
+				{
+					let c = ctx.clocks[k];
+					if( c.value < c.min - 0.0001 || c.value > c.max + 0.0001 ) isOk = false;
+					if( c.locked && c.value != c.txtvalue && c.txtvalue ) isOk = false;
+				}
+
+				if( isOk )
+				{
+					let row = document.getElementById( "solveEntries" ).insertRow( -1 );
+					for( var k in ctx.clocks )
+					{
+						let c = ctx.clocks[k];
+						let newCell = row.insertCell( -1 );
+						let v = c.value;
+						v = Number( v );
+						var str = "";
+						if( c.type === "select" )
+						{
+							str += `${c.optionValues[c.selIndex]} (${c.options[c.selIndex]}) (${Math.round((v + Number.EPSILON) * 100) / 100})`;
+						}
+						else
+						{
+							str += Math.round((v + Number.EPSILON) * 100) / 100;
+						}
+						newCell.appendChild( document.createTextNode( str ) );
+					}
+				}
+
+				ctx.solvnum++;
+			}
+		}
+
+		document.getElementById( "solveStatus" ).innerHTML = `Tested ${ctx.solvnum} solves`;
+
+		for( var i in ctx.clocks )
+		{
+			let b = ctxbackups[i];
+			let a = ctx.clocks[i];
+			a.value = b.value;
+			a.selIndex = b.selIndex;
+		}
 	}
-	
-	clkctx_dynamic.thread = setTimeout( solverThread, 0 );
 }
 
 function solveInternal( ctx )
@@ -240,23 +338,32 @@ function solveInternal( ctx )
 			c.computeFunction( c, ctx );
 		}
 	}
+}
+
+// Solve as caused by user input or on start, not the internal solver.
+function solve()
+{
+	// Solve for current UI state.
+	solveInternal( clkctx );
+
+	// Kick off a general solve.
+	let backup_thread = clkctx?.thread;
+	clkctx = clkctx;
+	clkctx.done = false;
+	clkctx.restart = true;
+	clkctx.thread = backup_thread;
+	document.getElementById( "solveEntries" ).innerHTML = "";
+	document.getElementById( "solveEntries" ).border = 1;
+	if( !clkctx.thread )
+	{
+		clkctx.thread = setInterval( solverThread, 0 );
+	}
 	updateOutput();
 }
 
-function solve()
+function loadFromURL(url)
 {
-	solveInternal( clkctx );
-	clkctx_dynamic = clkctx;
-	clkctx_dynamic.restart = true;
-	if( !clkctx_dynamic.thread )
-	{
-		clkctx_dynamic.thread = setTimeout( solverThread, 0 );
-	}
-}
-
-function loadFromURL()
-{
-	var fieldsv = window.location.href.split("?")[1];
+	var fieldsv = url.split("?")[1];
 	var fields = fieldsv ? fieldsv.split("&") : [];
 
 	// Find chipSelect.
@@ -298,6 +405,7 @@ function loadFromURL()
 					else
 					{
 						c.value = eqs[1];
+						c.txtvalue = c.value;
 					}
 				}
 			}
@@ -308,7 +416,7 @@ function loadFromURL()
 
 function onLoad()
 {
-	loadFromURL();
+	loadFromURL(window.location.href);
 }
 
 function wheelSel(ths, e, i)
@@ -327,9 +435,12 @@ function wheelSel(ths, e, i)
 	return true;
 }
 
+// At load or whenever the drop-down for type of chip is concerned.
 function onCSChange()
 {
 	var chipSelect = document.getElementById("chipSelect").value;
+
+	// Format: chip name,chip variant
 
 	chipType = chipSelect.split(",");
 	if( chipType[0] === "ch32vx05_7" )
@@ -341,11 +452,19 @@ function onCSChange()
 			chipSelectRev : chipType[1]
 		};
 
+		document.getElementById( "generalNotes" ).innerHTML = `
+			General notes:
+			<OL>
+			<LI>If using 10Mbit ethernet, PLL3CLK needs to be 60MHz.
+			<LI>TODO: Figure out USB HS Rules.
+			</OL>`;
+
 		if( chipType[1] === "d8c" )
 		{
 			clkctx.getClock( "PLL" ).options = [ 18, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 6.5, 15, 16 ];
 		}
 	}
+	// TODO: Add other chips here.
 
 	for( var i = 0; i < clkctx.clocks.length; i++ )
 	{
@@ -419,12 +538,10 @@ function onCSChange()
 </TABLE>
 <DIV ID=tableConstraints></DIV>
 
-General notes:
-<OL>
-<LI>If using 10Mbit ethernet, PLL3CLK needs to be 60MHz.
-<LI>If using GbE, PLL3VCO needs to be 125MHz.
-<LI>TODO: Figure out USB HS Rules.
-</OL>
+<DIV ID=generalNotes></DIV>
+
+<DIV ID=solveStatus></DIV>
+<TABLE ID=solveEntries></DIV>
 
 </BODY>
 </HTML>
