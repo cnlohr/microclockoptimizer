@@ -12,23 +12,7 @@ input.unmatch-input, textarea { background: rgba(255.0, 255.0, 0.0, 0.2 ); }
 
 <SCRIPT>
 var clkctx = null;
-
-function iterateOptions( ths, ctx )
-{
-	if( ths.locked ) return false;
-
-	var next = ths.selOpt + 1;
-	if( next == ths.optionValues.length )
-	{
-		ths.selOpt = 0;
-		return false;
-	}
-	else
-	{
-		ths.selOpt = next;
-		return true;
-	}
-}
+var knownChips = new Array();
 
 // Shadow parameters:
 //  .value = MHz
@@ -120,6 +104,53 @@ var clocks_ch32vx05_7 = [
 		iterateFunction : iterateOptions,
 	},
 ];
+
+knownChips.push( { id : "ch32vx05_7,d8c",    text : "CH32V30x_D8C, CH32V31x_D8C" } );
+knownChips.push( { id : "ch32vx05_7,v23def", text : "CH32V20x_D6, CH32V20x_D8" } );
+knownChips.push( { id : "ch32vx05_7,d8w",    text : "CH32V20x_D8W, CH32V30x_D8" } );
+
+function loadChipType( chipType, chipSelect )
+{
+	if( chipType[0] === "ch32vx05_7" )
+	{
+		clkctx = {
+			clocks : clocks_ch32vx05_7,
+			getClock( lname ) { return this.clocks.find( (element) => element.name == lname ); },
+			chipSelectMain : chipType[0],
+			chipSelectRev : chipType[1]
+		};
+
+		document.getElementById( "generalNotes" ).innerHTML = `
+			General notes:
+			<OL>
+			<LI>If using 10Mbit ethernet, PLL3CLK needs to be 60MHz.
+			<LI>TODO: Figure out USB HS Rules.
+			</OL>`;
+
+		if( chipType[1] === "d8c" )
+		{
+			clkctx.getClock( "PLL" ).options = [ 18, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 6.5, 15, 16 ];
+		}
+	}
+	// TODO: Add other chips here.
+}
+
+function iterateOptions( ths, ctx )
+{
+	if( ths.locked ) return false;
+
+	var next = ths.selOpt + 1;
+	if( next == ths.optionValues.length )
+	{
+		ths.selOpt = 0;
+		return false;
+	}
+	else
+	{
+		ths.selOpt = next;
+		return true;
+	}
+}
 
 function fieldUpdateText( e, fieldID )
 {
@@ -474,6 +505,15 @@ function loadFromURL(url)
 
 function onLoad()
 {
+	chipSelect = document.getElementById( "chipSelect" );
+	for( i in knownChips )
+	{
+		let c = knownChips[i];
+		var opt = document.createElement('option');
+		opt.value = c.id;
+		opt.innerHTML = c.text;
+		chipSelect.appendChild(opt);
+	}
 	loadFromURL(window.location.href);
 }
 
@@ -497,32 +537,10 @@ function wheelSel(ths, e, i)
 function onCSChange()
 {
 	var chipSelect = document.getElementById("chipSelect").value;
+	chipType = chipSelect.split(",");
 
 	// Format: chip name,chip variant
-
-	chipType = chipSelect.split(",");
-	if( chipType[0] === "ch32vx05_7" )
-	{
-		clkctx = {
-			clocks : clocks_ch32vx05_7,
-			getClock( lname ) { return this.clocks.find( (element) => element.name == lname ); },
-			chipSelectMain : chipType[0],
-			chipSelectRev : chipType[1]
-		};
-
-		document.getElementById( "generalNotes" ).innerHTML = `
-			General notes:
-			<OL>
-			<LI>If using 10Mbit ethernet, PLL3CLK needs to be 60MHz.
-			<LI>TODO: Figure out USB HS Rules.
-			</OL>`;
-
-		if( chipType[1] === "d8c" )
-		{
-			clkctx.getClock( "PLL" ).options = [ 18, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 6.5, 15, 16 ];
-		}
-	}
-	// TODO: Add other chips here.
+	loadChipType( chipType, chipSelect );
 
 	for( var i = 0; i < clkctx.clocks.length; i++ )
 	{
@@ -586,9 +604,6 @@ function onCSChange()
 <TR>
 <TD>
 <SELECT ID="chipSelect" onChange="onCSChange();solve();">
-<OPTION VALUE="ch32vx05_7,d8c">CH32V30x_D8C, CH32V31x_D8C</option>
-<OPTION VALUE="ch32vx05_7,v23def">CH32V20x_D6, CH32V20x_D8</option>
-<OPTION VALUE="ch32vx05_7,d8w">CH32V20x_D8W, CH32V30x_D8</option>
 </SELECT>
 </TD>
 <TD>
