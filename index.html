@@ -4,22 +4,14 @@
 <LINK rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
 <META charset="UTF-8">
 <STYLE>
-body { background-color: Canvas; color: CanvasText; }
 :root { color-scheme: dark; }
 input.bad-input, textarea { background: rgba(255.0, 0.0, 0.0, 0.2 ); }
+input.unmatch-input, textarea { background: rgba(255.0, 255.0, 0.0, 0.2 ); }
 </STYLE>
 
 <SCRIPT>
-// TODO: Update URL at top with all values populated.
 // TODO: Handle solving
 // TODO: Solve in web worker?
-
-var chipSelect = "";
-
-function getClock( lname )
-{
-	return clocks.find( (element) => element.name == lname );
-}
 
 function iterateOptions( ths )
 {
@@ -38,110 +30,49 @@ function iterateOptions( ths )
 	}
 }
 
-
-function computePrediv2( ths )
-{
-	ths.value = getClock( "HSE" ).value / ths.options[ths.selIndex];
-}
-function computePLL2( ths )
-{
-	ths.value = getClock( "PREDIV2" ).value * ths.options[ths.selIndex];
-}
-
-function computePLL2VCO( ths )
-{
-	ths.value = getClock( "PLL2CLK" ).value * 2;
-}
-
-function computePLL3( ths )
-{
-	ths.value = getClock( "PREDIV2" ).value * ths.options[ths.selIndex];
-}
-
-function computePLL3VCO( ths )
-{
-	ths.value = getClock( "PLL3CLK" ).value * 2;
-}
-
-function computePREDIV1SRC( ths )
-{
-	ths.value = getClock( ths.selIndex ? "HSE" : "PLL2CLK" ).value;
-}
-
-function computePrediv1( ths )
-{
-	ths.value = getClock( "PREDIV1SRC" ).value / ths.options[ths.selIndex];
-}
-
-function computePLLSRC( ths )
-{
-console.log( ">>>>" + ths.selIndex );
-	if( chipSelect == "d8c" )
-		ths.value = getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
-	else if( chipSelect == "v23def" )
-		ths.value = getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
-	else if( chipSelect == "d8w" )
-		ths.value = ths.selIndex ? (getClock( "HSE" ).value / 2) : getClock("PREDIV1" ).value;
-	else
-	{
-		ths.value = -5;
-	}
-}
-
-function computePLL( ths )
-{
-	ths.value = getClock( "PLLSRC" ).value * ths.options[ths.selIndex];
-}
-
-function computePLLVCO( ths )
-{
-	ths.value = getClock( "PLL" ).value * 2;
-}
-
-function computeSYSCLK( ths )
-{
-	ths.value = getClock( ths.options[ths.selIndex] ).value;
-}
-
-
 // Shadow parameters:
 //  .value = MHz
 //  .selIndex = index of selected option.
 //  .locked = target locking this value.
-var clocks = null;
+var clkctx_dynamic = null;
+var clkctx = null;
 var clocks_ch32vx05_7 = [
-	{ default : 8,    min : 8,  max : 8,  name : "HSI",          locked : true,  forceLocked : true, changable : false, type : "text" },
-	{ default : 24,   min : 3,  max : 25,  name : "HSE",         locked : true,  forceLocked : true, changable : true, type : "text" },
+	{ default : 8,    min : 8,  max : 8,  name : "HSI",          locked : true,  disableDynamic : true, changable : false, type : "text" },
+	{ default : 24,   min : 3,  max : 25,  name : "HSE",         locked : false, disableDynamic : true, changable : true, type : "text" },
 	{ default : 24,   min : 3,  max : 25,  name : "PREDIV2",     locked : true, changable : true, type : "select",
 		options : [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 ],
 		optionValues : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ],
 		defaultOption : 3,
-		computeFunction : computePrediv2,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( "HSE" ).value / ths.options[ths.selIndex]; } ,
 		iterateFunction : iterateOptions,
 	},
 	{ default : 62.5, min : 30, max : 75, name : "PLL2CLK",     locked : true, changable : true, type : "select",
 		options : [ 2.5, 12.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 20 ],
 		optionValues : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ],
 		defaultOption : 4,
-		computeFunction : computePLL2,
+		computeFunction : (ths,ctx)=>{ths.value = ctx.getClock( "PREDIV2" ).value * ths.options[ths.selIndex];},
 		iterateFunction : iterateOptions,
 	},
-	{ default : 125,  min : 60, max : 150,  name : "PLL2VCO",     locked : true, changable : false, computeFunction : computePLL2VCO, type : "text" },
-
+	{ default : 125,  min : 60, max : 150,  name : "PLL2VCO",     locked : false, changable : true,
+		computeFunction : (ths,ctx)=>{ths.value = ctx.getClock( "PLL2CLK" ).value * 2;},
+		type : "text"
+	},
 	{ default : 62.5, min : 30, max : 75, name : "PLL3CLK",     locked : true,  type : "select", changable : true,
 		options : [ 2.5, 12.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 20 ],
 		optionValues : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ],
 		defaultOption : 4,
-		computeFunction : computePLL3,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( "PREDIV2" ).value * ths.options[ths.selIndex]; },
 		iterateFunction : iterateOptions,
 	},
-	{ default : 125,  min : 60, max : 150,  name : "PLL3VCO",     locked : true, changable : false, computeFunction : computePLL3VCO, type : "text" },
-
+	{ default : 125,  min : 60, max : 150,  name : "PLL3VCO",     locked : false, changable : true,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( "PLL3CLK" ).value * 2; },
+		type : "text"
+	},
 	{ default : 8,   min : 3,  max : 150, name : "PREDIV1SRC",    locked : true, changable : true, type : "select",
 		options : [ "PLL2", "HSE" ],
 		optionValues : [ 0, 1 ],
 		defaultOption : 0,
-		computeFunction : computePREDIV1SRC,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PLL2CLK" ).value; },
 		iterateFunction : iterateOptions,
 	},
 
@@ -149,16 +80,26 @@ var clocks_ch32vx05_7 = [
 		options : [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 ],
 		optionValues : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ],
 		defaultOption : 2,
-		computeFunction : computePrediv1,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( "PREDIV1SRC" ).value / ths.options[ths.selIndex]; },
 		iterateFunction : iterateOptions,
 	},
-
 
 	{ default : 8, min : 3, max : 25, name : "PLLSRC",           locked : true, type : "select", changable : true, 
 		options : [ "PREDIV1", "HSI" ],
 		optionValues : [ 0, 1 ],
 		defaultOption : 0,
-		computeFunction : computePLLSRC,
+		computeFunction : (ths,ctx) => {
+			if( ctx.chipSelectRev == "d8c" )
+				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
+			else if( ctx.chipSelectRev == "v23def" )
+				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
+			else if( ctx.chipSelectRev == "d8w" )
+				ths.value = ths.selIndex ? (ctx.getClock( "HSE" ).value / 2) : ctx.getClock("PREDIV1" ).value;
+			else
+			{
+				ths.value = -5;
+			}
+		},
 		iterateFunction : iterateOptions,
 	},
 
@@ -166,114 +107,249 @@ var clocks_ch32vx05_7 = [
 		options : [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18 ],
 		optionValues : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ],
 		defaultOption : 4,
-		computeFunction : computePLL,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( "PLLSRC" ).value * ths.options[ths.selIndex]; },
 		iterateFunction : iterateOptions,
 	},
-	{ default : 144,  min : 60, max : 150,  name : "PLLVCO",     locked : true, changable : false, computeFunction : computePLLVCO, type : "text" },
+	{ default : 144,  min : 60, max : 150,  name : "PLLVCO", locked : false, changable : true,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( "PLL" ).value * 2; },
+		type : "text" },
 
-	{ default : 144, min : 1,   max : 150, name : "SYSCLK" ,     locked : true, changable : true, type : "select",
+	{ default : 144, min : 1,   max : 150, name : "SYSCLK" , locked : true, changable : true, type : "select",
 		options : [  "HSI", "HSE", "PLLVCO" ],
 		optionValues : [ 0, 1, 2 ],
 		defaultOption : 2,
-		computeFunction : computeSYSCLK,
+		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( ths.options[ths.selIndex] ).value; },
 		iterateFunction : iterateOptions,
 	},
 ];
 
 function fieldUpdateText( e, fieldID )
 {
-	clocks[fieldID].value = e.value;
+	clkctx.clocks[fieldID].value = e.value;
 	solve();
 }
 
 function fieldUpdateSelect( ths, fieldID )
 {
-	clocks[fieldID].selIndex = Number( ths.value );
+	clkctx.clocks[fieldID].selIndex = Number( ths.value );
+	solve();
+}
+
+function fieldUpdateLockBox( ths, fieldID )
+{
+	clkctx.clocks[fieldID].locked = ths.checked;
 	solve();
 }
 
 function updateOutput()
 {
-	for( var i = 0; i < clocks.length; i++ )
+	var uurl = window.location.href.split("?")[0] + "?";
+
+	// chipSelect must be first.
+	uurl += `chipSelect=${encodeURIComponent(document.getElementById("chipSelect").value)}&`;
+
+	for( var i = 0; i < clkctx.clocks.length; i++ )
 	{
-		let c = clocks[i];
+		let c = clkctx.clocks[i];
 		let tb = document.getElementById( c.name + "_text" );
-		tb.value = c.value;
+
 		if( c.value < c.min || c.value > c.max )
 			tb.classList.add("bad-input");
 		else
 			tb.classList.remove("bad-input");
 
+		if( c.locked )
+		{
+			if( c.type != "select" )
+			{
+				if( tb.value != c.value )
+					tb.classList.add("unmatch-input");
+				else
+					tb.classList.remove("unmatch-input");
+			}
+			else
+			{
+				tb.value = c.value;
+			}
+		}
+		else
+		{
+			tb.value = c.value;
+		}
+
+
+
 		if( c.type == "select" )
 		{
-			console.log( c.name + " " + c.selIndex );
-			document.getElementById( c.name + "_sel" ).value = c.selIndex;
+			tb.disabled = true;
+			let tsel = document.getElementById( c.name + "_sel" );
+			tsel.value = c.selIndex;
+			tsel.disabled = !c.locked;
+
+			uurl += `${c.name}=${c.selIndex}&`;
 		}
+		else
+		{
+			tb.disabled = (!c.locked) && (!c.disableDynamic);
+			uurl += `${c.name}=${encodeURIComponent(c.value)}&`;
+		}
+
 		if( c.changable )
 		{
-			document.getElementById( c.name + "_locked" ).checked = c.locked;
+			if( !c.disableDynamic )
+				document.getElementById( c.name + "_locked" ).checked = c.locked;
+		}
+		else
+		{
+			tb.disabled = true;
 		}
 	}
+	//Doing this will add every adjustment to your history. TODO: Consider removing it.
+	window.history.replaceState('', '', uurl);
+	urlField.innerHTML = `<A HREF="${uurl}">link</A>`;
+}
+
+function solverThread()
+{
+	let ctx = clkctx_dynamic;
+	if( ctx.restart )
+	{
+		for( var i in ctx.clocks )
+		{
+			ctx.clocks[i].selopt = 0;
+		}
+		ctx.clkadvanceindex = 0;
+	}
+	if( !ctx.done )
+	{
+		let remain = 0;
+		
+		console.log( clkctx_dynamic );
+	}
+	
+	clkctx_dynamic.thread = setTimeout( solverThread, 0 );
+}
+
+function solveInternal( ctx )
+{
+	for( var i = 0; i < ctx.clocks.length; i++ )
+	{
+		let c = ctx.clocks[i];
+		if( c.computeFunction != undefined )
+		{
+			c.computeFunction( c, ctx );
+		}
+	}
+	updateOutput();
 }
 
 function solve()
 {
-	for( var i = 0; i < clocks.length; i++ )
+	solveInternal( clkctx );
+	clkctx_dynamic = clkctx;
+	clkctx_dynamic.restart = true;
+	if( !clkctx_dynamic.thread )
 	{
-		let c = clocks[i];
-		if( c.computeFunction != undefined )
+		clkctx_dynamic.thread = setTimeout( solverThread, 0 );
+	}
+}
+
+function loadFromURL()
+{
+	var fieldsv = window.location.href.split("?")[1];
+	var fields = fieldsv ? fieldsv.split("&") : [];
+
+	// Find chipSelect.
+	var csFound = false;
+	for( var fid in fields )
+	{
+		var f = fields[fid];
+		var eqs = f.split("=");
+		eqs[1] = decodeURIComponent( eqs[1] );
+		if( eqs[0] === "chipSelect" )
 		{
-			c.computeFunction( c );
+			document.getElementById("chipSelect").value = eqs[1];
+			csFound = true;
+			onCSChange();
 		}
 	}
+	if( !csFound )
+	{
+		onCSChange();
+	}
 
-	updateOutput();
+	// Iterate through the rest of the fields.
+	for( var fid in fields )
+	{
+		var f = fields[fid];
+		var eqs = f.split("=");
+		eqs[1] = decodeURIComponent( eqs[1] );
+		if( eqs[0] !== "chipSelect" )
+		{
+			for( var cid in clkctx.clocks )
+			{
+				let c = clkctx.clocks[cid];
+				if( c.name == eqs[0] )
+				{
+					if( c.type === "select" )
+					{
+						c.selIndex = Number( eqs[1] );
+					}
+					else
+					{
+						c.value = eqs[1];
+					}
+				}
+			}
+		}
+	}
+	solve();
 }
 
 function onLoad()
 {
-	onCSChange();
-	solve();
+	loadFromURL();
 }
 
 function wheelSel(ths, e, i)
 {
+	e.preventDefault()
 	if( ths.hasFocus ) return;
-	console.log( ths.selectedIndex );
-	console.log( ths );
-	let c = clocks[i];
+	let c = clkctx.clocks[i];
 	if( e.deltaY < 0 )
-	//	ths.selectedIndex = 8;
 		ths.selectedIndex = Math.max(ths.selectedIndex - 1, 0);
 	if (e.deltaY > 0)
-	//	ths.selectedIndex = 6;
 		ths.selectedIndex = Math.min(ths.selectedIndex + 1, ths.length - 1);
 	ths.selIndex = Number(ths.selectedIndex);
-	ths.value = clocks[i].optionValues[ths.selIndex];
-	console.log( Math.min(ths.selectedIndex + 1, ths.length - 1) );
-	console.log( ths.selectedIndex );
+	ths.value = clkctx.clocks[i].optionValues[ths.selIndex];
 	fieldUpdateSelect( ths, i );
 	solve();
+	return true;
 }
 
 function onCSChange()
 {
-	chipSelect = document.getElementById("chipSelect").value;
+	var chipSelect = document.getElementById("chipSelect").value;
 
 	chipType = chipSelect.split(",");
-	console.log( chipType );
 	if( chipType[0] === "ch32vx05_7" )
 	{
-		clocks = clocks_ch32vx05_7;
+		clkctx = {
+			clocks : clocks_ch32vx05_7,
+			getClock( lname ) { return this.clocks.find( (element) => element.name == lname ); },
+			chipSelectMain : chipType[0],
+			chipSelectRev : chipType[1]
+		};
+
 		if( chipType[1] === "d8c" )
 		{
-			getClock( "PLL" ).options = [ 18, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 6.5, 15, 16 ];
+			clkctx.getClock( "PLL" ).options = [ 18, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 6.5, 15, 16 ];
 		}
 	}
 
-	for( var i = 0; i < clocks.length; i++ )
+	for( var i = 0; i < clkctx.clocks.length; i++ )
 	{
-		let c = clocks[i];
+		let c = clkctx.clocks[i];
 		c.value = c.default;
 		if( c.type == "select" )
 		{
@@ -283,17 +359,17 @@ function onCSChange()
 
 	var tabhtml = "<TABLE>";
 
-	for( var i = 0; i < clocks.length; i++ )
+	for( var i = 0; i < clkctx.clocks.length; i++ )
 	{
-		let c = clocks[i];
+		let c = clkctx.clocks[i];
 		tabhtml += `<TR><TD>${c.name}</TD>`;
 		//if( c.type == "text" )
 		var enableText = (c.changable && c.type == "text");
-		tabhtml += `<TD><INPUT SIZE=8 ID="${c.name}_text" VALUE=${c.default} ONCHANGE="fieldUpdateText(this, ${i});" ONKEYUP="fieldUpdateText(this, ${i});"${enableText ?"":"DISABLED" } >`;
+		tabhtml += `<TD><INPUT SIZE=8 ID="${c.name}_text" VALUE=${c.default} ONCHANGE="fieldUpdateText(this, ${i});" ONKEYUP="fieldUpdateText(this, ${i});" >`;
 		tabhtml += `</TD><TD>${c.min}-${c.max}</TD>`;
-		if( c.changable )
+		if( c.changable && !c.disableDynamic )
 		{
-			tabhtml += `<TD><INPUT TYPE=CHECKBOX ID="${c.name}_locked" VALUE="${c.locked}"></TD>`;
+			tabhtml += `<TD><INPUT TYPE=CHECKBOX ID="${c.name}_locked" VALUE="${c.locked}" ONCHANGE="fieldUpdateLockBox(this, ${i});"></TD>`;
 		}
 		else
 		{
@@ -326,18 +402,28 @@ function onCSChange()
 </HEAD>
 <BODY onLoad="onLoad();">
 
+<TABLE>
+<TR>
+<TD>
 <SELECT ID="chipSelect" onChange="onCSChange();">
 <OPTION VALUE="ch32vx05_7,d8c">CH32V30x_D8C, CH32V31x_D8C</option>
 <OPTION VALUE="ch32vx05_7,v23def">CH32V20x_D6, CH32V20x_D8</option>
 <OPTION VALUE="ch32vx05_7,d8w">CH32V20x_D8W, CH32V30x_D8</option>
 </SELECT>
-
+</TD>
+<TD>
+<DIV ID=urlField>
+</DIV>
+</TD>
+</TR>
+</TABLE>
 <DIV ID=tableConstraints></DIV>
 
 General notes:
 <OL>
 <LI>If using 10Mbit ethernet, PLL3CLK needs to be 60MHz.
 <LI>If using GbE, PLL3VCO needs to be 125MHz.
+<LI>TODO: Figure out USB HS Rules.
 </OL>
 
 </BODY>
