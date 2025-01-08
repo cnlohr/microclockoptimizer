@@ -8,5 +8,4 @@ Right now I just wrote a clock tree setup for the ch32v307. But it's ripe for th
 
 This project is still in its infancy, but PR's are open!
 
-![Image](https://github.com/cnlohr/microclockoptimizer/blob/resources/resources/initialReadme.png?raw=true)
-
+![initialReadme](https://github.com/user-attachments/assets/8b543b84-6ecf-4d94-b8e4-26fd99a928d5)

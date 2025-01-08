@@ -20,7 +20,7 @@ var knownChips = new Array();
 //  .locked = target locking this value.
 var clocks_ch32vx05_7 = [
 	{ default : 8,    min : 8,  max : 8,  name : "HSI",          locked : true,  disableDynamic : true, changable : false, type : "text" },
-	{ default : 24,   min : 3,  max : 25,  name : "HSE",         locked : false, disableDynamic : true, changable : true, type : "text" },
+	{ default : 24,   min : 3,  max : 32,  name : "HSE",         locked : false, disableDynamic : true, changable : true, type : "text" },
 	{ default : 24,   min : 3,  max : 25,  name : "PREDIV2",     locked : true, changable : true, type : "select",
 		options : [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 ],
 		optionValues : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ],
@@ -52,7 +52,7 @@ var clocks_ch32vx05_7 = [
 	},
 	{ default : 8,   min : 3,  max : 150, name : "PREDIV1SRC",    locked : true, changable : true, type : "select",
 		options : [ "PLL2", "HSE" ],
-		optionValues : [ 0, 1 ],
+		optionValues : [ 1, 0 ],
 		defaultOption : 0,
 		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PLL2CLK" ).value; },
 		iterateFunction : iterateOptions,
@@ -68,15 +68,15 @@ var clocks_ch32vx05_7 = [
 
 	{ default : 8, min : 3, max : 25, name : "PLLSRC",           locked : true, type : "select", changable : true, 
 		options : [ "PREDIV1", "HSI" ],
-		optionValues : [ 0, 1 ],
+		optionValues : [ 1, 0 ],
 		defaultOption : 0,
 		computeFunction : (ths,ctx) => {
 			if( ctx.chipSelectRev == "d8c" )
-				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
+				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value / 2;
 			else if( ctx.chipSelectRev == "v23def" )
-				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
+				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value / 2;
 			else if( ctx.chipSelectRev == "d8w" )
-				ths.value = ths.selIndex ? (ctx.getClock( "HSE" ).value / 2) : ctx.getClock("PREDIV1" ).value;
+				ths.value = ths.selIndex ? (ctx.getClock( "HSE" ).value / 2) : (ctx.getClock("PREDIV1" ).value / 2);
 			else
 			{
 				ths.value = -5;
