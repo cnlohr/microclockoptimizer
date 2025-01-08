@@ -72,11 +72,11 @@ var clocks_ch32vx05_7 = [
 		defaultOption : 0,
 		computeFunction : (ths,ctx) => {
 			if( ctx.chipSelectRev == "d8c" )
-				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
+				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value / 2;
 			else if( ctx.chipSelectRev == "v23def" )
-				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value;
+				ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PREDIV1" ).value / 2;
 			else if( ctx.chipSelectRev == "d8w" )
-				ths.value = ths.selIndex ? (ctx.getClock( "HSE" ).value / 2) : ctx.getClock("PREDIV1" ).value;
+				ths.value = ths.selIndex ? (ctx.getClock( "HSE" ).value / 2) : (ctx.getClock("PREDIV1" ).value / 2);
 			else
 			{
 				ths.value = -5;
