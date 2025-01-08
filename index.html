@@ -52,7 +52,7 @@ var clocks_ch32vx05_7 = [
 	},
 	{ default : 8,   min : 3,  max : 150, name : "PREDIV1SRC",    locked : true, changable : true, type : "select",
 		options : [ "PLL2", "HSE" ],
-		optionValues : [ 0, 1 ],
+		optionValues : [ 1, 0 ],
 		defaultOption : 0,
 		computeFunction : (ths,ctx) => { ths.value = ctx.getClock( ths.selIndex ? "HSE" : "PLL2CLK" ).value; },
 		iterateFunction : iterateOptions,
@@ -68,7 +68,7 @@ var clocks_ch32vx05_7 = [
 
 	{ default : 8, min : 3, max : 25, name : "PLLSRC",           locked : true, type : "select", changable : true, 
 		options : [ "PREDIV1", "HSI" ],
-		optionValues : [ 0, 1 ],
+		optionValues : [ 1, 0 ],
 		defaultOption : 0,
 		computeFunction : (ths,ctx) => {
 			if( ctx.chipSelectRev == "d8c" )
